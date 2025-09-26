@@ -6,7 +6,7 @@ import json
 import re
 
 # ===== Загружаем переменные из .env =====
-load_dotenv()  # автоматически ищет файл .env в проекте
+load_dotenv()
 
 email = os.getenv("CONFLUENCE_EMAIL")
 api_token = os.getenv("CONFLUENCE_TOKEN")
@@ -19,10 +19,11 @@ if not email or not api_token:
 confluence_url = "https://rusblock6.atlassian.net/wiki"
 space_key = "MFS"
 page_title = "Словарь АСУ ГТК для клиента"
-file_path = "C:\\docs\\output\\dic_innerl.html"
+md_file_path = r"C:\docs\output\dic_innerl.html"
+pdf_file_path = r"C:\docs\output\dic_innerl_2025-09-26.pdf"  # Уже существующий PDF
 
 # ===== Чтение Markdown =====
-with open(file_path, "r", encoding="utf-8") as f:
+with open(md_file_path, "r", encoding="utf-8") as f:
     md_content = f.read()
 
 # ===== Конвертация Markdown -> HTML =====
@@ -95,7 +96,28 @@ else:
     )
 
     if r.status_code in [200, 201]:
+        page_id = r.json()["id"]
         print("✅ Страница успешно создана!")
     else:
         print(f"❌ Ошибка при создании страницы: {r.status_code}")
         print(r.text)
+        exit()
+
+# ===== Прикрепление существующего PDF =====
+with open(pdf_file_path, "rb") as f:
+    files = {
+        'file': (os.path.basename(pdf_file_path), f, 'application/pdf')
+    }
+    attach_url = f"{confluence_url}/rest/api/content/{page_id}/child/attachment"
+    attach_resp = requests.post(
+        attach_url,
+        auth=HTTPBasicAuth(email, api_token),
+        files=files,
+        headers={"X-Atlassian-Token": "no-check"}  # ✅ отключаем XSRF проверку
+    )
+
+if attach_resp.status_code in [200, 201]:
+    print("✅ PDF успешно прикреплён к странице")
+else:
+    print(f"❌ Ошибка при прикреплении PDF: {attach_resp.status_code}")
+    print(attach_resp.text)
