@@ -19,7 +19,7 @@ if not email or not api_token:
 confluence_url = "https://rusblock6.atlassian.net/wiki"
 space_key = "MFS"
 page_title = "Словарь АСУ ГТК для клиента"
-file_path = "../dic_innerl.html"
+file_path = "C:\\docs\\output\\dic_innerl.html"
 
 # ===== Чтение Markdown =====
 with open(file_path, "r", encoding="utf-8") as f:
