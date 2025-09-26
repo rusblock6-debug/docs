@@ -1,0 +1,9 @@
+# Секреты
+.env
+
+# Python служебные файлы
+__pycache__/
+*.pyc
+
+# VSCode настройки
+.vscode/
