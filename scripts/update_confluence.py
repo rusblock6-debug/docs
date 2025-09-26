@@ -1,20 +1,25 @@
+import os
+from dotenv import load_dotenv
 import requests
 from requests.auth import HTTPBasicAuth
 import json
 import re
 
-# ===== Загружаем секреты =====
-with open("secrets.json", "r", encoding="utf-8") as f:
-    secrets = json.load(f)
+# ===== Загружаем переменные из .env =====
+load_dotenv()  # автоматически ищет файл .env в проекте
 
-email = secrets["email"]
-api_token = secrets["api_token"]
+email = os.getenv("CONFLUENCE_EMAIL")
+api_token = os.getenv("CONFLUENCE_TOKEN")
+
+if not email or not api_token:
+    print("❌ Ошибка: переменные CONFLUENCE_EMAIL и CONFLUENCE_TOKEN не заданы")
+    exit()
 
 # ===== Параметры =====
 confluence_url = "https://rusblock6.atlassian.net/wiki"
 space_key = "MFS"
 page_title = "Словарь АСУ ГТК для клиента"
-file_path = "dic_inner.HTML"
+file_path = "../dic_innerl.html"
 
 # ===== Чтение Markdown =====
 with open(file_path, "r", encoding="utf-8") as f:
@@ -30,7 +35,6 @@ for entry in entries:
     lines = entry.strip().split("\n", 1)
     header = lines[0].strip()
     body = lines[1].strip() if len(lines) > 1 else ""
-
     html_parts.append(f"<h2>{header}</h2>")
     html_parts.append(f"<p>{body}</p>")
 
@@ -48,7 +52,6 @@ if response.status_code != 200:
 
 data = response.json()
 if data["size"] > 0:
-    # Страница есть → обновляем
     page_id = data["results"][0]["id"]
     version_number = data["results"][0]["version"]["number"] + 1
 
@@ -76,7 +79,6 @@ if data["size"] > 0:
         print(r.text)
 
 else:
-    # Страницы нет → создаём
     create_url = f"{confluence_url}/rest/api/content/"
     payload = {
         "type": "page",
