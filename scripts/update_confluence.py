@@ -5,7 +5,6 @@ from requests.auth import HTTPBasicAuth
 import json
 import re
 
-# ===== Загружаем переменные из .env =====
 load_dotenv()
 
 email = os.getenv("CONFLUENCE_EMAIL")
@@ -15,109 +14,86 @@ if not email or not api_token:
     print("❌ Ошибка: переменные CONFLUENCE_EMAIL и CONFLUENCE_TOKEN не заданы")
     exit()
 
-# ===== Параметры =====
 confluence_url = "https://rusblock6.atlassian.net/wiki"
 space_key = "MFS"
-page_title = "Словарь АСУ ГТК для клиента"
-md_file_path = r"C:\docs\output\dic_innerl.html"
-pdf_file_path = r"C:\docs\output\dic_innerl_2025-09-26.pdf"  # Уже существующий PDF
 
-# ===== Чтение Markdown =====
-with open(md_file_path, "r", encoding="utf-8") as f:
-    md_content = f.read()
+pages = [
+    {"title": "Словарь АСУ ГТК для внутреннего пользователя", "html_file_path": r"C:\docs\output\dic_innerl.html"},
+    {"title": "Словарь АСУ ГТК для клиента", "html_file_path": r"C:\docs\output\dic_customer.html"}
+]
 
-# ===== Конвертация Markdown -> HTML =====
-entries = re.split(r"\n## ", md_content)
-html_parts = []
+def upload_page(title, html_file_path):
+    if not os.path.exists(html_file_path):
+        print(f"❌ HTML не найден: {html_file_path}")
+        return
 
-for entry in entries:
-    if not entry.strip():
-        continue
-    lines = entry.strip().split("\n", 1)
-    header = lines[0].strip()
-    body = lines[1].strip() if len(lines) > 1 else ""
-    html_parts.append(f"<h2>{header}</h2>")
-    html_parts.append(f"<p>{body}</p>")
+    with open(html_file_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
 
-html_content = "\n".join(html_parts)
 
-# ===== Проверка существующей страницы =====
-search_url = f"{confluence_url}/rest/api/content"
-params = {"title": page_title, "spaceKey": space_key, "expand": "version"}
-response = requests.get(search_url, params=params, auth=HTTPBasicAuth(email, api_token))
+    html_content = re.sub(r'style="[^"]*text-align:[^"]*"', '', html_content)
+    
+    html_content = re.sub(r'<p([^>]*)>', r'<p\1 align="left">', html_content)
+    html_content = re.sub(r'<h([1-6])([^>]*)>', r'<h\1\2 align="left">', html_content)
 
-if response.status_code != 200:
-    print(f"Ошибка при поиске страницы: {response.status_code}")
-    print(response.text)
-    exit()
+       search_url = f"{confluence_url}/rest/api/content"
+    params = {"title": title, "spaceKey": space_key, "expand": "version"}
+    response = requests.get(search_url, params=params, auth=HTTPBasicAuth(email, api_token))
 
-data = response.json()
-if data["size"] > 0:
-    page_id = data["results"][0]["id"]
-    version_number = data["results"][0]["version"]["number"] + 1
+    if response.status_code != 200:
+        print(f"❌ Ошибка при поиске страницы '{title}': {response.status_code}")
+        print(response.text)
+        return
 
-    update_url = f"{confluence_url}/rest/api/content/{page_id}"
-    payload = {
-        "id": page_id,
-        "type": "page",
-        "title": page_title,
-        "space": {"key": space_key},
-        "body": {"storage": {"value": html_content, "representation": "storage"}},
-        "version": {"number": version_number},
-    }
+    data = response.json()
+    if data["size"] > 0:
+        page_id = data["results"][0]["id"]
+        version_number = data["results"][0]["version"]["number"] + 1
 
-    r = requests.put(
-        update_url,
-        data=json.dumps(payload),
-        headers={"Content-Type": "application/json"},
-        auth=HTTPBasicAuth(email, api_token),
-    )
+        update_url = f"{confluence_url}/rest/api/content/{page_id}"
+        payload = {
+            "id": page_id,
+            "type": "page",
+            "title": title,
+            "space": {"key": space_key},
+            "body": {"storage": {"value": html_content, "representation": "storage"}},
+            "version": {"number": version_number},
+        }
 
-    if r.status_code in [200, 201]:
-        print("✅ Страница успешно обновлена!")
+        r = requests.put(
+            update_url,
+            data=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+            auth=HTTPBasicAuth(email, api_token),
+        )
+
+        if r.status_code in [200, 201]:
+            print(f"✅ Страница '{title}' успешно обновлена!")
+        else:
+            print(f"❌ Ошибка при обновлении '{title}': {r.status_code}")
+            print(r.text)
+
     else:
-        print(f"❌ Ошибка при обновлении: {r.status_code}")
-        print(r.text)
+        create_url = f"{confluence_url}/rest/api/content/"
+        payload = {
+            "type": "page",
+            "title": title,
+            "space": {"key": space_key},
+            "body": {"storage": {"value": html_content, "representation": "storage"}},
+        }
 
-else:
-    create_url = f"{confluence_url}/rest/api/content/"
-    payload = {
-        "type": "page",
-        "title": page_title,
-        "space": {"key": space_key},
-        "body": {"storage": {"value": html_content, "representation": "storage"}},
-    }
+        r = requests.post(
+            create_url,
+            data=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+            auth=HTTPBasicAuth(email, api_token),
+        )
 
-    r = requests.post(
-        create_url,
-        data=json.dumps(payload),
-        headers={"Content-Type": "application/json"},
-        auth=HTTPBasicAuth(email, api_token),
-    )
+        if r.status_code in [200, 201]:
+            print(f"✅ Страница '{title}' успешно создана!")
+        else:
+            print(f"❌ Ошибка при создании '{title}': {r.status_code}")
+            print(r.text)
 
-    if r.status_code in [200, 201]:
-        page_id = r.json()["id"]
-        print("✅ Страница успешно создана!")
-    else:
-        print(f"❌ Ошибка при создании страницы: {r.status_code}")
-        print(r.text)
-        exit()
-
-# ===== Прикрепление существующего PDF =====
-with open(pdf_file_path, "rb") as f:
-    files = {
-        'file': (os.path.basename(pdf_file_path), f, 'application/pdf')
-    }
-    attach_url = f"{confluence_url}/rest/api/content/{page_id}/child/attachment"
-    attach_resp = requests.post(
-        attach_url,
-        auth=HTTPBasicAuth(email, api_token),
-        files=files,
-        headers={"X-Atlassian-Token": "no-check"}  # ✅ отключаем XSRF проверку
-    )
-
-if attach_resp.status_code in [200, 201]:
-    print("✅ PDF успешно прикреплён к странице")
-else:
-    print(f"❌ Ошибка при прикреплении PDF: {attach_resp.status_code}")
-    print(attach_resp.text)
+for page in pages:
+    upload_page(page["title"], page["html_file_path"])
