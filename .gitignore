@@ -1,9 +1,15 @@
-# Секреты
 .env
-
-# Python служебные файлы
+secrets.json
+*.key
+*.token
+*.txt
 __pycache__/
-*.pyc
-
-# VSCode настройки
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
 .vscode/
+*.log
+.DS_Store
+Thumbs.db
