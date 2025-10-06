@@ -1,0 +1,15 @@
+.env
+secrets.json
+*.key
+*.token
+*.txt
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
